@@ -4,7 +4,7 @@ public interface IIdentityProvider<TIdentity, in TKey>
 	where TKey : IEquatable<TKey>
 	where TIdentity : IIdentity<TKey>
 {
-	Task<User> CreateAsync(string username);
+	Task<User> CreateAsync(string username, string password);
 
 	Task<User> UpdateAsync(TIdentity identity);
 
@@ -15,4 +15,6 @@ public interface IIdentityProvider<TIdentity, in TKey>
 	Task<TIdentity> GetByIdAsync(TKey id);
 
 	Task<User> GetByUsernameAsync(string username);
+
+	Task<bool> ValidatePassword(TIdentity identity, string password);
 }

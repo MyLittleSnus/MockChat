@@ -13,11 +13,11 @@ public class UserManager(
 {
 	private readonly UserConnectionResolver _resolver = new();
 
-	public async Task<User?> SaveUserAsync(User user)
+	public async Task<User?> SaveAsync(User user, string password)
 	{
 		try
 		{
-			User created = await userProvider.CreateAsync(user.Username);
+			User created = await userProvider.CreateAsync(user.Username, password);
 
 			logger.LogInformation(
 				"User {Username} {UserId} has been created successfully",
@@ -38,6 +38,9 @@ public class UserManager(
 
 		return null;
 	}
+
+	public async Task<bool> ValidatePasswordAsync(User? user, string password) => 
+		user is not null && await userProvider.ValidatePassword(user, password);
 
 	public async Task Connect(User user, string connectionId)
 	{

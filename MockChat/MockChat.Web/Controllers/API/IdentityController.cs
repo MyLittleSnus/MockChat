@@ -32,7 +32,7 @@ public class IdentityController(IUserManager userManager) : Controller
 
 			if (usernameTaken) return Conflict();
 
-			newUser = await userManager.SaveUserAsync(new User(request.Username));
+			newUser = await userManager.SaveAsync(new User(request.Username), request.Password);
 			registerNotSuccessful = newUser is null;
 		} while (registerNotSuccessful);
 
@@ -45,8 +45,9 @@ public class IdentityController(IUserManager userManager) : Controller
 	public async Task<IActionResult> Login([FromBody] IdentityRequest request)
 	{
 		User? user = await userManager.GetAsync(request.Username);
+		bool passwordValid = await userManager.ValidatePasswordAsync(user, request.Password);
 
-		if (user is null) return NotFound();
+		if (user is null || !passwordValid) return Unauthorized();
 
 		return Ok(user);
 	}

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AutoMapper;
 using MockChat.Core;
 using MockChat.Core.Abstractions;
 using MockChat.Core.Exceptions.Identity;
@@ -6,9 +7,15 @@ using MockChat.Core.Exceptions.Performance;
 
 namespace MockChat.Infrustructure.IdentityManagement;
 
-public sealed class UserProvider : IIdentityProvider<User, Guid>
+internal class UserWithPassword(string username, string password, string? connectionId = null) 
+	: User(username, connectionId)
 {
-	private readonly ConcurrentDictionary<Guid, User> _users = new();
+	public string PasswordHash { get; set; }
+}
+
+public sealed class UserProvider(IMapper mapper) : IIdentityProvider<User, Guid>
+{
+	private readonly ConcurrentDictionary<Guid, UserWithPassword> _users = new();
 	private readonly ConcurrentDictionary<string, Guid> _index = new();
 
 	private struct Index(Guid key, string username)
@@ -26,9 +33,11 @@ public sealed class UserProvider : IIdentityProvider<User, Guid>
 		}
 	} 
 	
-	public Task<User> CreateAsync(string username)
+	public Task<User> CreateAsync(string username, string password)
 	{
-		User user = new(username);
+		string passwordHash = HashProvider.Sha512(password);
+		UserWithPassword user = new(username, passwordHash);
+		
 		bool addResult = _users.TryAdd(user.Id, user);
 		
 		if (!addResult) throw new IdentityCreateException();
@@ -38,18 +47,17 @@ public sealed class UserProvider : IIdentityProvider<User, Guid>
 
 		if (!indexResult) throw new IndexFailedException();
 		
-		return Task.FromResult(user);
+		return Task.FromResult(user as User);
 	}
 
 	public Task<User> UpdateAsync(User identity)
 	{
-		bool found = _users.TryGetValue(identity.Id, out User? user);
-
+		bool found = _users.TryGetValue(identity.Id, out UserWithPassword? user);
 		if (!found) throw new IdentityNotFoundException();
-		
-		user = identity;
 
-		return Task.FromResult(user);
+		mapper.Map(identity, user);
+
+		return Task.FromResult(user as User)!;
 	}
 
 	public Task DeleteAsync(Guid id)
@@ -61,15 +69,14 @@ public sealed class UserProvider : IIdentityProvider<User, Guid>
 		return Task.CompletedTask;
 	}
 
-	public Task<IEnumerable<User>> GetAsync() => Task.FromResult(_users.Select(u => u.Value));
+	public Task<IEnumerable<User>> GetAsync() => Task.FromResult(_users.Select(u => u.Value as User));
 
 	public Task<User> GetByIdAsync(Guid id)
 	{
-		bool found = _users.TryGetValue(id, out User? user);
-		
+		bool found = _users.TryGetValue(id, out UserWithPassword? user);
 		if (!found) throw new IdentityNotFoundException();
 
-		return Task.FromResult(user!);
+		return Task.FromResult(user as User)!;
 	}
 
 	public async Task<User> GetByUsernameAsync(string username)
@@ -92,5 +99,12 @@ public sealed class UserProvider : IIdentityProvider<User, Guid>
 		}
 
 		return user;
+	}
+
+	public Task<bool> ValidatePassword(User identity, string password)
+	{
+		bool found = _users.TryGetValue(identity.Id, out UserWithPassword? user);
+		
+		return Task.FromResult(found && user!.PasswordHash.Equals(password));
 	}
 }

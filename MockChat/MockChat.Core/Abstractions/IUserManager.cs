@@ -5,11 +5,14 @@ namespace MockChat.Core.Abstractions;
 public interface IUserManager
 {
 	/// <summary>
-	/// Saves user in the identity storage
+	/// Saves user in the identity storage with provided password
 	/// </summary>
 	/// <param name="user"></param>
+	/// <param name="password"></param>
 	/// <returns></returns>
-	Task<User?> SaveUserAsync(User user);
+	Task<User?> SaveAsync(User user, string password);
+
+	Task<bool> ValidatePasswordAsync(User? user, string password);
 
 	/// <summary>
 	/// Sync user`s connection
